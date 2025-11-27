@@ -2,6 +2,9 @@
 import { useState, useEffect, useRef } from 'react';
 import TB from "./_components/TB";
 import RL from "./_components/RL";
+import Accet from './_components/Accet';
+import Fin from './_components/Fin';
+import Power from './_components/Power';
 
 /* =========================
    БАЗОВЫЙ КЛАСС МАШИНЫ
@@ -1034,7 +1037,7 @@ export default function Home() {
                         <button
                             onClick={startAnimation}
                             disabled={isAnimationStarted}
-                            className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white ${isAnimationStarted
+                            className={`flex-1 px-3 py-1.5 rounded-lg bg-blue-500 text-[11px] font-semibold text-white ${isAnimationStarted
                                 ? 'bg-gray-400 cursor-not-allowed'
                                 : 'bg-emerald-600 hover:bg-emerald-700'
                                 }`}
@@ -1074,7 +1077,7 @@ export default function Home() {
                                 : 'bg-gray-100 text-gray-700 border-gray-300'
                                 }`}
                         >
-                            {isAiMode ? 'YOQ' : 'O‘CHIR'}
+                            {isAiMode ? 'O`chirish' : 'Yoqish'}
                         </button>
                     </div>
                 </div>
@@ -1245,7 +1248,7 @@ export default function Home() {
                         <span className="font-semibold">Yuqori/Past</span>
                         <button
                             onClick={() => setAutoTB(prev => !prev)}
-                            className={`px-2 py-0.5 rounded-full text-[10px] border ${autoTB
+                            className={`px-2 py-0.5 rounded-full bg-blue-500 text-[10px] border ${autoTB
                                 ? 'bg-emerald-500 text-white border-emerald-500'
                                 : 'bg-gray-100 text-gray-700 border-gray-300'
                                 }`}
@@ -1276,6 +1279,11 @@ export default function Home() {
                         <span>Jami mashina: {rlStats.total} ta</span>
                         <span>Kutyapti: {rlStats.waiting} ta</span>
                     </div>
+                </div>
+                <div className='flex items-center flex-col gap-[5px] bg-[white] p-[10px] rounded-[10px] absolute w-[200px] top-[18px] left-[300px]'>
+                    <Accet />
+                    <Fin />
+                    <Power />
                 </div>
 
                 {/* Umumiy STATISTIKA MODAL – oq tema */}
