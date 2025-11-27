@@ -1,6 +1,8 @@
 import Dashboard from "../Components/Admin/Dashboard";
+import PowerAlertsPage from "../Components/Admin/PowerLight/PowerLight";
 import ProfilePage from "../Components/Admin/Profile/Pofile";
 import RedEvents from "../Components/Admin/RedEvents/RedEvents";
+import ViolationsGrid from "../Components/Admin/Violations/Violations";
 
 export const Rout = [
     {
@@ -17,5 +19,15 @@ export const Rout = [
         name:"profile",
         path:"profile",
         component:<ProfilePage/>
+    },
+    {
+        name:"violations",
+        path:"fines",
+        component:<ViolationsGrid/>
+    },
+    {
+        name:"power",
+        path:"powers",
+        component:<PowerAlertsPage/>
     }
 ]

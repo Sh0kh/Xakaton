@@ -7,6 +7,8 @@ import { MapPin, FileText, Clock, Activity } from "lucide-react";
 
 export default function AccidentPage() {
     const userId = Cookies.get("user_id");
+    console.log("id",userId);
+    
     const [accidents, setAccidents] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -24,13 +26,17 @@ export default function AccidentPage() {
         fetchAccidents();
 
         socket.emit("joinDispatcher", userId);
-
+        // socket.onAny((ev, data) => console.log("EVENT:", ev, data));
         socket.on("newAccident", (data) => {
             if (data.dispatcher_id === userId) fetchAccidents();
+            console.log(data);           
         });
 
-        return () => socket.off("joinDispatcher");
-    }, []);
+        return () =>  {
+            socket.off("newAccident");
+            // socket.offAny();
+        }
+    }, [userId]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 px-8 py-10">
