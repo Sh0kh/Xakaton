@@ -63,8 +63,10 @@ class Car {
             return;
         }
 
+        // ---- MASOFANI CHIROYLI QILIB TEKSHIRISH ----
         const carAhead = this.checkCarAhead(allCars);
         if (carAhead) {
+            // Juda yaqin – orqa mashina to‘xtaydi
             this.isWaiting = true;
             this.stoppedForCar = true;
             this.stoppedForLight = false;
@@ -72,6 +74,7 @@ class Car {
             return;
         }
 
+        // Oldida mashina yo‘q – tez qayta harakatlanadi
         this.isWaiting = false;
         this.stoppedForLight = false;
         this.stoppedForCar = false;
@@ -164,60 +167,69 @@ class Car {
     }
 
     checkCarAhead(allCars) {
-        // Очень близко (~30px) – только тогда стоп
-        const safeDistance = 30;
+        // Mashina o'lchami va xavfsiz oraliq
+        const carLength = 32;   // div width/height bilan mos
+        const safeGap = 18;     // mashinalar orasidagi “bo‘sh joy”
+        const stopDistance = carLength + safeGap; // markazdan markazgacha min masofa (~50px)
 
-        // В повороте после нескольких шагов не тормозим,
-        // чтобы не было дёрганий на дуге.
+        // Povorot bo'ylab anchadan beri ketayotgan bo'lsa,
+        // ortidagi mashinaga bog'liq bo'lmasligi uchun tekshirmaymiz
         if (this.lane.includes('_turn_') && this.currentStep > 4) {
             return null;
         }
 
-        const myLaneGroup = this.laneGroup || this.lane;
-
-        const carsOnSameLane = allCars.filter(otherCar =>
-            otherCar.id !== this.id &&
-            otherCar.isActive &&
-            (otherCar.laneGroup || otherCar.lane) === myLaneGroup
-        );
-
-        if (carsOnSameLane.length === 0) return null;
-
         let closestCar = null;
         let minDistance = Infinity;
 
-        for (let otherCar of carsOnSameLane) {
-            let distance = 0;
-            let isAhead = false;
+        for (let otherCar of allCars) {
+            if (otherCar.id === this.id) continue;
+            if (!otherCar.isActive) continue;
 
-            if (this.direction === 'down') {
-                isAhead = otherCar.position.y > this.position.y;
-                distance = otherCar.position.y - this.position.y;
-            } else if (this.direction === 'up') {
-                isAhead = otherCar.position.y < this.position.y;
-                distance = this.position.y - otherCar.position.y;
-            } else if (this.direction === 'right') {
-                isAhead = otherCar.position.x > this.position.x;
-                distance = otherCar.position.x - this.position.x;
-            } else if (this.direction === 'left') {
-                isAhead = otherCar.position.x < this.position.x;
-                distance = this.position.x - otherCar.position.x;
+            // Faqat bir xil yo'nalishdagi mashinalarni ko'ramiz
+            if (otherCar.direction !== this.direction) continue;
+
+            let isAhead = false;
+            let longitudinalDist = 0; // yo'nalish bo'yicha masofa
+            let lateralDist = 0;      // yon tomonga farq
+
+            if (this.direction === 'down' || this.direction === 'up') {
+                // Vertikal yo'nalish: x juda uzoq bo'lsa — bu boshqa yo'l
+                lateralDist = Math.abs(otherCar.position.x - this.position.x);
+                if (lateralDist > 20) continue;
+
+                if (this.direction === 'down') {
+                    isAhead = otherCar.position.y > this.position.y;
+                    longitudinalDist = otherCar.position.y - this.position.y;
+                } else {
+                    isAhead = otherCar.position.y < this.position.y;
+                    longitudinalDist = this.position.y - otherCar.position.y;
+                }
+            } else {
+                // Gorizontal yo'nalish: y juda uzoq bo'lsa — bu boshqa yo'l
+                lateralDist = Math.abs(otherCar.position.y - this.position.y);
+                if (lateralDist > 20) continue;
+
+                if (this.direction === 'right') {
+                    isAhead = otherCar.position.x > this.position.x;
+                    longitudinalDist = otherCar.position.x - this.position.x;
+                } else {
+                    isAhead = otherCar.position.x < this.position.x;
+                    longitudinalDist = this.position.x - otherCar.position.x;
+                }
             }
 
-            // На всякий случай отсеиваем странные случаи
-            if (!isAhead || distance <= 0) continue;
+            if (!isAhead || longitudinalDist <= 0) continue;
 
-            // Стоп только если прям очень близко
-            if (distance <= safeDistance && distance < minDistance) {
-                minDistance = distance;
+            // Agar markazlar orasidagi masofa stopDistance dan kichik bo'lsa —
+            // juda yaqin, to'xtash kerak
+            if (longitudinalDist < stopDistance && longitudinalDist < minDistance) {
+                minDistance = longitudinalDist;
                 closestCar = otherCar;
             }
         }
 
         return closestCar;
     }
-
-
 
 
     isAtIntersection(position) {
@@ -303,6 +315,47 @@ function createVehicleInstanceFromSnapshot(carSnapshot) {
     return instance;
 }
 
+/* =========================
+   LANE GA STATISTIKA
+========================= */
+
+// Svetofor id -> laneGroup
+const getLaneGroupForLight = (lightId) => {
+    switch (lightId) {
+        case 1: return 'top_down';
+        case 2: return 'bottom_up';
+        case 3: return 'left_right';
+        case 4: return 'right_left';
+        default: return null;
+    }
+};
+
+// LaneGroup bo‘yicha jami va kutayotgan mashinalar
+const getLaneStats = (laneGroup, cars) => {
+    if (!laneGroup) return { total: 0, waiting: 0 };
+
+    const laneCars = cars.filter(c => (c.laneGroup || c.lane) === laneGroup);
+    const waitingCars = laneCars.filter(c => c.isWaiting);
+
+    return {
+        total: laneCars.length,
+        waiting: waitingCars.length
+    };
+};
+
+// TB (top/bottom) va RL (left/right) bo‘yicha umumiy stats
+const getDirectionStats = (directionKey, cars) => {
+    let groups = [];
+    if (directionKey === 'TB') {
+        groups = ['top_down', 'bottom_up'];
+    } else if (directionKey === 'RL') {
+        groups = ['left_right', 'right_left'];
+    }
+    const total = cars.filter(c => groups.includes(c.laneGroup)).length;
+    const waiting = cars.filter(c => groups.includes(c.laneGroup) && c.isWaiting).length;
+    return { total, waiting };
+};
+
 export default function Home() {
     const [cars, setCars] = useState([]);
     const [trafficLights, setTrafficLights] = useState([]);
@@ -310,6 +363,12 @@ export default function Home() {
     const [selectedTurn, setSelectedTurn] = useState('straight');
     const [selectedVehicleType, setSelectedVehicleType] = useState('car');
     const [isAiMode, setIsAiMode] = useState(false);
+    const [showStatsModal, setShowStatsModal] = useState(false);
+
+    // Auto spawn boshqaruvi
+    const [autoTB, setAutoTB] = useState(true); // top/bottom – 3s
+    const [autoRL, setAutoRL] = useState(true); // left/right – 1s
+
     const animationRef = useRef(null);
 
     const carsRef = useRef([]);
@@ -326,188 +385,6 @@ export default function Home() {
         ];
         setTrafficLights(lights);
     }, []);
-
-    /* =========================
-       AI ДЛЯ СВЕТОФОРА + обычный цикл
-    ========================= */
-    useEffect(() => {
-        let cycleStep = 0;
-        let stepTimer = 0;
-        const emergencyTypes = ['ambulance', 'police', 'firetruck'];
-
-        const interval = setInterval(() => {
-            let verticalColor, horizontalColor;
-
-            if (isAiMode) {
-                const currentCars = carsRef.current;
-
-                const verticalEmergency = currentCars.some(
-                    c =>
-                        emergencyTypes.includes(c.vehicleType) &&
-                        (c.direction === 'up' || c.direction === 'down')
-                );
-                const horizontalEmergency = currentCars.some(
-                    c =>
-                        emergencyTypes.includes(c.vehicleType) &&
-                        (c.direction === 'left' || c.direction === 'right')
-                );
-
-                const verticalCount = currentCars.filter(
-                    c => c.direction === 'up' || c.direction === 'down'
-                ).length;
-                const horizontalCount = currentCars.filter(
-                    c => c.direction === 'left' || c.direction === 'right'
-                ).length;
-
-                if (verticalEmergency && !horizontalEmergency) {
-                    verticalColor = 'green';
-                    horizontalColor = 'red';
-                } else if (horizontalEmergency && !verticalEmergency) {
-                    verticalColor = 'red';
-                    horizontalColor = 'green';
-                } else if (verticalEmergency && horizontalEmergency) {
-                    verticalColor = 'red';
-                    horizontalColor = 'red';
-                } else if (verticalCount === 0 && horizontalCount === 0) {
-                    stepTimer++;
-
-                    if (cycleStep === 0 && stepTimer >= 400) {
-                        cycleStep = 1;
-                        stepTimer = 0;
-                    } else if (cycleStep === 1 && stepTimer >= 50) {
-                        cycleStep = 2;
-                        stepTimer = 0;
-                    } else if (cycleStep === 2 && stepTimer >= 400) {
-                        cycleStep = 3;
-                        stepTimer = 0;
-                    } else if (cycleStep === 3 && stepTimer >= 50) {
-                        cycleStep = 0;
-                        stepTimer = 0;
-                    }
-
-                    switch (cycleStep) {
-                        case 0:
-                            verticalColor = 'red';
-                            horizontalColor = 'green';
-                            break;
-                        case 1:
-                            verticalColor = 'yellow';
-                            horizontalColor = 'yellow';
-                            break;
-                        case 2:
-                            verticalColor = 'green';
-                            horizontalColor = 'red';
-                            break;
-                        case 3:
-                            verticalColor = 'yellow';
-                            horizontalColor = 'yellow';
-                            break;
-                        default:
-                            verticalColor = 'red';
-                            horizontalColor = 'green';
-                    }
-                } else if (verticalCount === 0 && horizontalCount > 0) {
-                    verticalColor = 'red';
-                    horizontalColor = 'green';
-                } else if (horizontalCount === 0 && verticalCount > 0) {
-                    verticalColor = 'green';
-                    horizontalColor = 'red';
-                } else if (verticalCount > horizontalCount + 3) {
-                    verticalColor = 'green';
-                    horizontalColor = 'red';
-                } else if (horizontalCount > verticalCount + 3) {
-                    verticalColor = 'red';
-                    horizontalColor = 'green';
-                } else {
-                    stepTimer++;
-
-                    if (cycleStep === 0 && stepTimer >= 400) {
-                        cycleStep = 1;
-                        stepTimer = 0;
-                    } else if (cycleStep === 1 && stepTimer >= 50) {
-                        cycleStep = 2;
-                        stepTimer = 0;
-                    } else if (cycleStep === 2 && stepTimer >= 400) {
-                        cycleStep = 3;
-                        stepTimer = 0;
-                    } else if (cycleStep === 3 && stepTimer >= 50) {
-                        cycleStep = 0;
-                        stepTimer = 0;
-                    }
-
-                    switch (cycleStep) {
-                        case 0:
-                            verticalColor = 'red';
-                            horizontalColor = 'green';
-                            break;
-                        case 1:
-                            verticalColor = 'yellow';
-                            horizontalColor = 'yellow';
-                            break;
-                        case 2:
-                            verticalColor = 'green';
-                            horizontalColor = 'red';
-                            break;
-                        case 3:
-                            verticalColor = 'yellow';
-                            horizontalColor = 'yellow';
-                            break;
-                        default:
-                            verticalColor = 'red';
-                            horizontalColor = 'green';
-                    }
-                }
-            } else {
-                stepTimer++;
-
-                if (cycleStep === 0 && stepTimer >= 400) {
-                    cycleStep = 1;
-                    stepTimer = 0;
-                } else if (cycleStep === 1 && stepTimer >= 50) {
-                    cycleStep = 2;
-                    stepTimer = 0;
-                } else if (cycleStep === 2 && stepTimer >= 400) {
-                    cycleStep = 3;
-                    stepTimer = 0;
-                } else if (cycleStep === 3 && stepTimer >= 50) {
-                    cycleStep = 0;
-                    stepTimer = 0;
-                }
-
-                switch (cycleStep) {
-                    case 0:
-                        verticalColor = 'red';
-                        horizontalColor = 'green';
-                        break;
-                    case 1:
-                        verticalColor = 'yellow';
-                        horizontalColor = 'yellow';
-                        break;
-                    case 2:
-                        verticalColor = 'green';
-                        horizontalColor = 'red';
-                        break;
-                    case 3:
-                        verticalColor = 'yellow';
-                        horizontalColor = 'yellow';
-                        break;
-                    default:
-                        verticalColor = 'red';
-                        horizontalColor = 'green';
-                }
-            }
-
-            setTrafficLights(prev =>
-                prev.map(light => {
-                    const isVertical = light.id === 1 || light.id === 2;
-                    const color = isVertical ? verticalColor : horizontalColor;
-                    return { ...light, color };
-                })
-            );
-        }, 100);
-
-        return () => clearInterval(interval);
-    }, [isAiMode]);
 
     /* =========================
        ПУТИ
@@ -670,10 +547,12 @@ export default function Home() {
     };
 
     /* =========================
-       ДОБАВЛЕНИЕ МАШИН
+       ДОБАВЛЕНИЕ МАШИН (ручное + автоспавн использует то же)
     ========================= */
-    const addCar = (pathKey, turn = 'straight') => {
+    const addCar = (pathKey, turn = 'straight', vehicleTypeOverride = null) => {
         let effectiveTurn = turn;
+
+        const vt = vehicleTypeOverride || selectedVehicleType;
 
         const colorByType = {
             car: '#f9fafb',
@@ -682,7 +561,7 @@ export default function Home() {
             firetruck: '#dc2626'
         };
 
-        const color = colorByType[selectedVehicleType] || colorByType.car;
+        const color = colorByType[vt] || colorByType.car;
 
         let direction = '';
         if (pathKey.includes('top_down')) direction = 'down';
@@ -707,9 +586,9 @@ export default function Home() {
         }
 
         let VehicleClass = Car;
-        if (selectedVehicleType === 'ambulance') VehicleClass = Ambulance;
-        else if (selectedVehicleType === 'police') VehicleClass = PoliceCar;
-        else if (selectedVehicleType === 'firetruck') VehicleClass = FireTruck;
+        if (vt === 'ambulance') VehicleClass = Ambulance;
+        else if (vt === 'police') VehicleClass = PoliceCar;
+        else if (vt === 'firetruck') VehicleClass = FireTruck;
 
         const newCar = new VehicleClass(
             Date.now() + Math.random(),
@@ -720,7 +599,7 @@ export default function Home() {
             effectiveTurn
         );
 
-        newCar.vehicleType = selectedVehicleType;
+        newCar.vehicleType = vt;
         newCar.color = color;
         newCar.isActive = false;
 
@@ -740,6 +619,7 @@ export default function Home() {
         }
     };
 
+    // Mashinalarni yuritish
     useEffect(() => {
         if (!isAnimationStarted) return;
 
@@ -767,6 +647,7 @@ export default function Home() {
         };
     }, [trafficLights, isAnimationStarted]);
 
+    // Har 600ms – navbatdagi mashinani "start" qilish
     useEffect(() => {
         if (!isAnimationStarted) return;
 
@@ -790,6 +671,288 @@ export default function Home() {
         return () => clearInterval(interval);
     }, [isAnimationStarted]);
 
+    /* =========================
+       AUTO SPAWN:
+       - RL (left/right)  – 1 sekund
+       - TB (top/bottom)  – 3 sekund
+    ========================= */
+    useEffect(() => {
+        if (!isAnimationStarted) return;
+
+        let rlInterval = null;
+        let tbInterval = null;
+
+        if (autoRL) {
+            rlInterval = setInterval(() => {
+                // RL: chapdan-o‘ngga va o‘ngdan-chapga
+                const keys = ['left_right_top', 'left_right_bottom', 'right_left_top', 'right_left_bottom'];
+                const key = keys[Math.floor(Math.random() * keys.length)];
+                addCar(key, selectedTurn);
+            }, 1000); // 1 sekund
+        }
+
+        if (autoTB) {
+            tbInterval = setInterval(() => {
+                // TB: yuqoridan-pastga va pastdan-yuqoriga
+                const keys = ['top_down_left', 'top_down_right', 'bottom_up_left', 'bottom_up_right'];
+                const key = keys[Math.floor(Math.random() * keys.length)];
+                addCar(key, selectedTurn);
+            }, 3000); // 3 sekund
+        }
+
+        return () => {
+            if (rlInterval) clearInterval(rlInterval);
+            if (tbInterval) clearInterval(tbInterval);
+        };
+    }, [isAnimationStarted, autoRL, autoTB, selectedTurn, selectedVehicleType]);
+
+    /* =========================
+       AI ДЛЯ СВЕТОФОРА + обычный цикл
+    ========================= */
+    /* =========================
+       AI ДЛЯ СВЕТОФОРА + обычный цикл
+       - Har doim: yashil → sariq → qizil
+       - Sariq rangda HECH QAYSI mashina yurmaydi (shouldStopForTrafficLight da yellow = stop)
+       - AI rejimida sariq biroz KO‘PROQ yonadi, chorraha tozalansin
+    ========================= */
+    useEffect(() => {
+        let cycleStep = 0;
+        let stepTimer = 0;
+        const emergencyTypes = ['ambulance', 'police', 'firetruck'];
+
+        // Oldingi holat (qaysi tomonda qanaqa rang bo‘lgan)
+        let prevVertical = 'red';
+        let prevHorizontal = 'green';
+
+        // Necha tiks sariqda ushlab turamiz
+        let yellowHold = 0;
+
+        // AI va oddiy rejim uchun sariq davomiyligi (tick = 100ms)
+        const YELLOW_HOLD_AI = 12;      // 12 * 100ms = 1.2s
+        const YELLOW_HOLD_NORMAL = 5;   // 5 * 100ms = 0.5s
+
+        const interval = setInterval(() => {
+            let verticalColor;
+            let horizontalColor;
+
+            // Agar hozir "sariq pauza" bo'lsa — ikkala tomonda ham sariq yonadi
+            if (yellowHold > 0) {
+                yellowHold--;
+                verticalColor = 'yellow';
+                horizontalColor = 'yellow';
+            } else {
+                let targetVertical;
+                let targetHorizontal;
+
+                if (isAiMode) {
+                    const currentCars = carsRef.current;
+
+                    const verticalEmergency = currentCars.some(
+                        c =>
+                            emergencyTypes.includes(c.vehicleType) &&
+                            (c.direction === 'up' || c.direction === 'down')
+                    );
+                    const horizontalEmergency = currentCars.some(
+                        c =>
+                            emergencyTypes.includes(c.vehicleType) &&
+                            (c.direction === 'left' || c.direction === 'right')
+                    );
+
+                    const verticalCount = currentCars.filter(
+                        c => c.direction === 'up' || c.direction === 'down'
+                    ).length;
+                    const horizontalCount = currentCars.filter(
+                        c => c.direction === 'left' || c.direction === 'right'
+                    ).length;
+
+                    // AI logika – faqat qaysi tomonga ko'proq yashil berishni hal qiladi
+                    if (verticalEmergency && !horizontalEmergency) {
+                        // faqat vertikalga spetsmashina – vertikalga yashil
+                        targetVertical = 'green';
+                        targetHorizontal = 'red';
+                    } else if (horizontalEmergency && !verticalEmergency) {
+                        // faqat gorizontalga spetsmashina – gorizontalga yashil
+                        targetVertical = 'red';
+                        targetHorizontal = 'green';
+                    } else if (verticalEmergency && horizontalEmergency) {
+                        // Ikkala tomonda ham spetsmashina bor:
+                        // ko'proq mashina yig'ilgan tomonni o'tkazamiz
+                        if (verticalCount > horizontalCount) {
+                            // vertikal yo'nalishda ko'proq mashina
+                            targetVertical = 'green';
+                            targetHorizontal = 'red';
+                        } else if (horizontalCount > verticalCount) {
+                            // gorizontal yo'nalishda ko'proq mashina
+                            targetVertical = 'red';
+                            targetHorizontal = 'green';
+                        } else {
+                            // teng bo'lsa – xavfsizlik uchun ikkala taraf ham qizil
+                            targetVertical = 'red';
+                            targetHorizontal = 'red';
+                        }
+                    } else if (verticalCount === 0 && horizontalCount === 0) {
+                        stepTimer++;
+
+                        if (cycleStep === 0 && stepTimer >= 400) {
+                            cycleStep = 1;
+                            stepTimer = 0;
+                        } else if (cycleStep === 1 && stepTimer >= 50) {
+                            cycleStep = 2;
+                            stepTimer = 0;
+                        } else if (cycleStep === 2 && stepTimer >= 400) {
+                            cycleStep = 3;
+                            stepTimer = 0;
+                        } else if (cycleStep === 3 && stepTimer >= 50) {
+                            cycleStep = 0;
+                            stepTimer = 0;
+                        }
+
+                        switch (cycleStep) {
+                            case 0:
+                                targetVertical = 'red';
+                                targetHorizontal = 'green';
+                                break;
+                            case 1:
+                                targetVertical = 'yellow';
+                                targetHorizontal = 'yellow';
+                                break;
+                            case 2:
+                                targetVertical = 'green';
+                                targetHorizontal = 'red';
+                                break;
+                            case 3:
+                                targetVertical = 'yellow';
+                                targetHorizontal = 'yellow';
+                                break;
+                            default:
+                                targetVertical = 'red';
+                                targetHorizontal = 'green';
+                        }
+                    } else if (verticalCount === 0 && horizontalCount > 0) {
+                        targetVertical = 'red';
+                        targetHorizontal = 'green';
+                    } else if (horizontalCount === 0 && verticalCount > 0) {
+                        targetVertical = 'green';
+                        targetHorizontal = 'red';
+                    } else if (verticalCount > horizontalCount + 3) {
+                        targetVertical = 'green';
+                        targetHorizontal = 'red';
+                    } else if (horizontalCount > verticalCount + 3) {
+                        targetVertical = 'red';
+                        targetHorizontal = 'green';
+                    } else {
+                        stepTimer++;
+
+                        if (cycleStep === 0 && stepTimer >= 400) {
+                            cycleStep = 1;
+                            stepTimer = 0;
+                        } else if (cycleStep === 1 && stepTimer >= 50) {
+                            cycleStep = 2;
+                            stepTimer = 0;
+                        } else if (cycleStep === 2 && stepTimer >= 400) {
+                            cycleStep = 3;
+                            stepTimer = 0;
+                        } else if (cycleStep === 3 && stepTimer >= 50) {
+                            cycleStep = 0;
+                            stepTimer = 0;
+                        }
+
+                        switch (cycleStep) {
+                            case 0:
+                                targetVertical = 'red';
+                                targetHorizontal = 'green';
+                                break;
+                            case 1:
+                                targetVertical = 'yellow';
+                                targetHorizontal = 'yellow';
+                                break;
+                            case 2:
+                                targetVertical = 'green';
+                                targetHorizontal = 'red';
+                                break;
+                            case 3:
+                                targetVertical = 'yellow';
+                                targetHorizontal = 'yellow';
+                                break;
+                            default:
+                                targetVertical = 'red';
+                                targetHorizontal = 'green';
+                        }
+                    }
+                } else {
+                    // Oddiy rejim – eski sikl
+                    stepTimer++;
+
+                    if (cycleStep === 0 && stepTimer >= 400) {
+                        cycleStep = 1;
+                        stepTimer = 0;
+                    } else if (cycleStep === 1 && stepTimer >= 50) {
+                        cycleStep = 2;
+                        stepTimer = 0;
+                    } else if (cycleStep === 2 && stepTimer >= 400) {
+                        cycleStep = 3;
+                        stepTimer = 0;
+                    } else if (cycleStep === 3 && stepTimer >= 50) {
+                        cycleStep = 0;
+                        stepTimer = 0;
+                    }
+
+                    switch (cycleStep) {
+                        case 0:
+                            targetVertical = 'red';
+                            targetHorizontal = 'green';
+                            break;
+                        case 1:
+                            targetVertical = 'yellow';
+                            targetHorizontal = 'yellow';
+                            break;
+                        case 2:
+                            targetVertical = 'green';
+                            targetHorizontal = 'red';
+                            break;
+                        case 3:
+                            targetVertical = 'yellow';
+                            targetHorizontal = 'yellow';
+                            break;
+                        default:
+                            targetVertical = 'red';
+                            targetHorizontal = 'green';
+                    }
+                }
+
+                // --- Shu yerda: yashil → qizil bo'layotganda avval UZOQ sariq ---
+                const verticalGreenToRed =
+                    prevVertical === 'green' && targetVertical === 'red';
+                const horizontalGreenToRed =
+                    prevHorizontal === 'green' && targetHorizontal === 'red';
+
+                if (verticalGreenToRed || horizontalGreenToRed) {
+                    // AI rejimida sariq uzoqroq, oddiyda qisqaroq
+                    yellowHold = isAiMode ? YELLOW_HOLD_AI : YELLOW_HOLD_NORMAL;
+                    verticalColor = 'yellow';
+                    horizontalColor = 'yellow';
+                } else {
+                    verticalColor = targetVertical;
+                    horizontalColor = targetHorizontal;
+                }
+            }
+
+            prevVertical = verticalColor;
+            prevHorizontal = horizontalColor;
+
+            setTrafficLights(prev =>
+                prev.map(light => {
+                    const isVertical = light.id === 1 || light.id === 2;
+                    const color = isVertical ? verticalColor : horizontalColor;
+                    return { ...light, color };
+                })
+            );
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, [isAiMode]);
+
+
     const getCarRotation = (direction) => {
         switch (direction) {
             case 'up': return 'rotate(0deg)';
@@ -805,6 +968,10 @@ export default function Home() {
         "flex items-center justify-center shadow-md border border-gray-300 " +
         "hover:bg-gray-100 hover:scale-105 transition-transform";
 
+    // TB/RL stats
+    const tbStats = getDirectionStats('TB', cars);
+    const rlStats = getDirectionStats('RL', cars);
+
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-900 overflow-hidden">
             <div className="relative w-full max-w-[100%] h-screen">
@@ -813,7 +980,7 @@ export default function Home() {
                     <TB trafficLights={trafficLights} />
                     <RL trafficLights={trafficLights} />
 
-                    {/* Машины */}
+                    {/* Mashinalar */}
                     {cars.map(car => (
                         <div
                             key={car.id}
@@ -841,7 +1008,14 @@ export default function Home() {
                     ))}
                 </div>
 
-                {/* ПАНЕЛИ ДОБАВЛЕНИЯ МАШИН */}
+                {/* STATISTIKA MODAL TUGMASI */}
+                <button
+                    onClick={() => setShowStatsModal(true)}
+                    className="absolute bottom-4 right-4 z-40 text-[10px] px-3 py-1.5 rounded-full bg-white/95 text-gray-900 shadow border border-gray-200 hover:bg-gray-100"
+                >
+                    Umumiy yo‘l statistikasi
+                </button>
+
                 {/* CHAP YUQORI PANEL – ANIMATSIYA / AI */}
                 <div className="absolute top-4 left-4 bg-white/95 text-gray-900 p-3 rounded-2xl shadow-xl backdrop-blur-sm border border-gray-200 w-[260px] space-y-3">
                     <div className="flex items-center justify-between">
@@ -858,7 +1032,7 @@ export default function Home() {
                         <button
                             onClick={startAnimation}
                             disabled={isAnimationStarted}
-                            className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] bg-blue-500 font-semibold text-white ${isAnimationStarted
+                            className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white ${isAnimationStarted
                                 ? 'bg-gray-400 cursor-not-allowed'
                                 : 'bg-emerald-600 hover:bg-emerald-700'
                                 }`}
@@ -993,7 +1167,6 @@ export default function Home() {
                     </div>
                 </div>
 
-
                 {/* Сверху (движение вниз) */}
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 flex gap-2 bg-black/25 px-2 py-1 rounded-full backdrop-blur-sm border border-white/10">
                     <button
@@ -1029,7 +1202,6 @@ export default function Home() {
                         +
                     </button>
                 </div>
-
                 {/* Слева (движение вправо) */}
                 <div className="absolute left-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 bg-black/25 px-1.5 py-2 rounded-full backdrop-blur-sm border border-white/10">
                     <button
@@ -1065,6 +1237,86 @@ export default function Home() {
                         +
                     </button>
                 </div>
+                {/* TB (Yuqoridan/pastdan) AUTO SPAWN PANEL – alohida “modal” */}
+                <div className="absolute bottom-[140px] left-[280px] bg-white/95 text-gray-900 p-3 rounded-2xl shadow-xl border border-gray-200 w-[220px] text-[11px] space-y-2">
+                    <div className="flex items-center justify-between">
+                        <span className="font-semibold">Yuqori/Past</span>
+                        <button
+                            onClick={() => setAutoTB(prev => !prev)}
+                            className={`px-2 py-0.5 rounded-full text-[10px] border ${autoTB
+                                ? 'bg-emerald-500 text-white border-emerald-500'
+                                : 'bg-gray-100 text-gray-700 border-gray-300'
+                                }`}
+                        >
+                            {autoTB ? 'Auto ON (3s)' : 'Auto OFF'}
+                        </button>
+                    </div>
+                    <div className="flex justify-between">
+                        <span>Jami mashina: {tbStats.total} ta</span>
+                        <span>Kutyapti: {tbStats.waiting} ta</span>
+                    </div>
+                </div>
+                {/* RL (Chap/O‘ng) AUTO SPAWN PANEL – alohida “modal” */}
+                <div className="absolute top-[140px] right-[280px] bg-white/95 text-gray-900 p-3 rounded-2xl shadow-xl border border-gray-200 w-[220px] text-[11px] space-y-2">
+                    <div className="flex items-center justify-between">
+                        <span className="font-semibold">Chap/O‘ng</span>
+                        <button
+                            onClick={() => setAutoRL(prev => !prev)}
+                            className={`px-2 py-0.5 rounded-full text-[10px] border ${autoRL
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-gray-100 text-gray-700 border-gray-300'
+                                }`}
+                        >
+                            {autoRL ? 'Auto ON (1s)' : 'Auto OFF'}
+                        </button>
+                    </div>
+                    <div className="flex justify-between">
+                        <span>Jami mashina: {rlStats.total} ta</span>
+                        <span>Kutyapti: {rlStats.waiting} ta</span>
+                    </div>
+                </div>
+
+                {/* Umumiy STATISTIKA MODAL – oq tema */}
+                {showStatsModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                        <div className="bg-white text-black rounded-2xl shadow-2xl w-[320px] max-w-[90%] p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <h2 className="font-semibold text-sm">
+                                    Yo‘l bo‘yicha mashinalar statistikasi
+                                </h2>
+                                <button
+                                    onClick={() => setShowStatsModal(false)}
+                                    className="text-xs px-2 py-1 rounded-full bg-black/5"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div className="space-y-2 text-[11px]">
+                                {['top_down', 'bottom_up', 'left_right', 'right_left'].map(group => {
+                                    const stats = getLaneStats(group, cars);
+                                    return (
+                                        <div
+                                            key={group}
+                                            className="border border-black/10 rounded-xl px-3 py-2"
+                                        >
+                                            <div className="font-medium mb-1">
+                                                {group === 'top_down' && 'Yuqoridan pastga'}
+                                                {group === 'bottom_up' && 'Pastdan yuqoriga'}
+                                                {group === 'left_right' && 'Chapdan o‘ngga'}
+                                                {group === 'right_left' && 'O‘ngdan chapga'}
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Jami: {stats.total} ta</span>
+                                                <span>Kutyapti: {stats.waiting} ta</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
