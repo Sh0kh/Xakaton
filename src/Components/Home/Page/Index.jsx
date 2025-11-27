@@ -687,7 +687,8 @@ export default function Home() {
                 // RL: chapdan-o‘ngga va o‘ngdan-chapga
                 const keys = ['left_right_top', 'left_right_bottom', 'right_left_top', 'right_left_bottom'];
                 const key = keys[Math.floor(Math.random() * keys.length)];
-                addCar(key, selectedTurn);
+                // AUTO → faqat oddiy mashina
+                addCar(key, selectedTurn, 'car');
             }, 1000); // 1 sekund
         }
 
@@ -696,7 +697,8 @@ export default function Home() {
                 // TB: yuqoridan-pastga va pastdan-yuqoriga
                 const keys = ['top_down_left', 'top_down_right', 'bottom_up_left', 'bottom_up_right'];
                 const key = keys[Math.floor(Math.random() * keys.length)];
-                addCar(key, selectedTurn);
+                // AUTO → faqat oddiy mashina
+                addCar(key, selectedTurn, 'car');
             }, 3000); // 3 sekund
         }
 
@@ -704,7 +706,7 @@ export default function Home() {
             if (rlInterval) clearInterval(rlInterval);
             if (tbInterval) clearInterval(tbInterval);
         };
-    }, [isAnimationStarted, autoRL, autoTB, selectedTurn, selectedVehicleType]);
+    }, [isAnimationStarted, autoRL, autoTB, selectedTurn]);
 
     /* =========================
        AI ДЛЯ СВЕТОФОРА + обычный цикл
