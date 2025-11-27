@@ -1,127 +1,149 @@
-import React, { useState } from "react";
-import { Button, Input } from "@material-tailwind/react";
-import { useNavigate } from "react-router-dom";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import { useRef, useState } from "react";
+import { useAuth } from "../../../hooks/useAuth";
 import { Auth } from "../../../utils/Controllers/Auth";
-import { Alert } from "../../../utils/Alert";
+import { toastService } from "../../../utils/toast";
+import { useNavigate } from "react-router-dom";
 
-
-const Login = () => {
-  const [username, setUsername] = useState("");e
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+export default function Login() {
+  const { login } = useAuth();
   const navigate = useNavigate();
 
+  const logInput = useRef("");
+  const passInput = useRef("");
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
+  const [errors, setErrors] = useState({ login: "", password: "" });
+  const [loading, setLoading] = useState(false);
+
+  const clearError = (field) => {
+    setErrors((prev) => ({ ...prev, [field]: "" }));
   };
-  const handleLogin = async () => {
+
+  const handleSubmit = async () => {
+    const loginText = logInput.current.value.trim();
+    const password = passInput.current.value.trim();
+
+    const newErrors = {};
+
+    if (!loginText) newErrors.login = "Login kiritilmadi";
+    if (!password) newErrors.password = "Parol kiritilmadi";
+    else if (password.length < 6)
+      newErrors.password = "Parol kamida 6 belgi bo‘lishi kerak";
+
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) return;
+
     try {
       setLoading(true);
-      const { data } = await Auth.Login({ username, password });
-      const { access_token, role } = data?.data || {}
-      localStorage.setItem("token", access_token);
-      const roleMap = {
-        SUPR_ADMIN: "SPAfefefeUID",
-        ADMIN: "AutngergUID",
-        SELLER: "SefwfmgrUID",
+
+      const payload = {
+        username: loginText,
+        password: password,
       };
 
-      localStorage.setItem("qwer", roleMap[role] || "");
+      const res = await Auth.Login(payload);
 
-      Alert("Muvaffaqiyatli", "success");
-      navigate('/')
-    } catch (error) {
-      Alert(error?.response?.data?.message || error.message || "Xatolik yuz berdi", "error");
+      if (res.status === 200 || res.status === 201) {
+        const data = res.data;
+
+        login({
+          token: data.tokens.access_token,
+          refreshToken: data.tokens.refresh_token,
+          user: data.newUser
+        });
+
+        if (data.newUser.role === "dispatcher") {
+          toastService.success("Successfully");
+          navigate("/admin/dashboard");
+        } else {
+          toastService.error("Role mos kelmadi");
+        }
+      } else {
+        toastService.error(res?.data?.message || "Xatolik!");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      handleLogin();
-    }
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-neutral-900 to-gray-800 px-2">
-      <div className="w-full max-w-md bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl p-8 border border-white/20">
-        {/* 🔹 Заголовок сверху */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white tracking-wide">
-            Login
-          </h1>
-          <p className="mt-2 text-sm text-gray-300">
-            Kirish uchun ma'lumotlarni kiriting
-          </p>
-        </div>
-        <div className="space-y-6">
-          <div>
-            <label
-              htmlFor="Username"
-              className="block text-sm font-medium text-gray-200 mb-1"
-            >
-              Login
-            </label>
-            <Input
-              id="Username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder=""
-              className="bg-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-white"
-              crossOrigin={undefined}
-            />
-          </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-200 px-4">
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-200 mb-1"
-            >
-              Parol
-            </label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Parolni kiriting"
-                className="bg-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-white"
-                crossOrigin={undefined}
-              />
-              <button
-                type="button"
-                onClick={togglePasswordVisibility}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white focus:outline-none"
-              >
-                {showPassword ? (
-                  <VisibilityOffIcon className="h-5 w-5" />
-                ) : (
-                  <VisibilityIcon className="h-5 w-5" />
-                )}
-              </button>
-            </div>
+      {/* Main Card */}
+      <div className="w-full max-w-md bg-white backdrop-blur-xl border border-gray-200/60 shadow-xl shadow-gray-300/30 rounded-2xl px-8 py-10">
+
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
+          <div className="w-20 h-20 rounded-full bg-white border border-gray-200 shadow-lg shadow-blue-200 flex items-center justify-center text-xl font-bold text-blue-700 tracking-wide relative">
+            <div className="absolute inset-0 rounded-full bg-blue-500/10 blur-xl"></div>
+            YPX
           </div>
-          <Button
-            onClick={handleLogin}
-            disabled={loading}
-            ripple={true}
-            className="w-full bg-white text-black font-bold py-3 rounded-xl shadow-lg hover:bg-gray-200 transition"
-          >
-            {loading ? "Yuklanmoqda..." : "Kirish"}
-          </Button>
         </div>
+
+        {/* Title */}
+        <h1 className="text-center text-3xl font-semibold text-gray-800 mb-2">
+          Kirish
+        </h1>
+        <p className="text-center text-gray-500 mb-8">
+          Tizimga kirish uchun ma’lumotlarni kiriting
+        </p>
+
+        {/* Login Input */}
+        <div className="mb-6">
+          <label className="block text-gray-700 font-medium mb-1.5">
+            Login
+          </label>
+          <input
+            ref={logInput}
+            onChange={() => clearError("login")}
+            type="text"
+            placeholder="Loginni kiriting"
+            className={`w-full border ${errors.login ? "border-red-500" : "border-gray-300"
+              } rounded-xl px-4 py-3 text-gray-900 bg-white focus:border-blue-600 outline-none transition`}
+          />
+          {errors.login && (
+            <p className="text-red-500 text-xs mt-1">{errors.login}</p>
+          )}
+        </div>
+
+        {/* Password Input */}
+        <div className="mb-4">
+          <label className="block text-gray-700 font-medium mb-1.5">
+            Parol
+          </label>
+          <input
+            ref={passInput}
+            onChange={() => clearError("password")}
+            type="password"
+            placeholder="Parolni kiriting"
+            className={`w-full border ${errors.password ? "border-red-500" : "border-gray-300"
+              } rounded-xl px-4 py-3 text-gray-900 bg-white focus:border-blue-600 outline-none transition`}
+          />
+          {errors.password && (
+            <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+          )}
+        </div>
+
+
+        {/* Forgot */}
+        <div className="flex justify-end mb-6">
+          <button className="text-sm text-blue-600 hover:underline">
+            Parolni unutdingizmi?
+          </button>
+        </div>
+
+        {/* Submit Button */}
+        <button
+          onClick={handleSubmit}
+          disabled={loading}
+          className={`w-full py-3 rounded-xl text-white font-semibold transition transform ${loading
+            ? "bg-blue-400 cursor-not-allowed"
+            : "bg-gradient-to-r from-blue-600 to-blue-500 hover:scale-[1.02] hover:shadow-lg"
+            }`}
+        >
+          {loading ? "Yuklanmoqda..." : "Kirish"}
+        </button>
       </div>
     </div>
   );
-};
-
-export default Login;
+}

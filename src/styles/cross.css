@@ -1,0 +1,27 @@
+.cross {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+.map {
+    border: 2px dashed red;
+    width: 1004px;
+    height: 704px;
+    position: relative;
+
+}
+.boc {
+    width: 20px;
+    height: 40px;
+    background-color: aqua;
+}
+
+.left_top_box {
+    position: absolute;
+    box-sizing: border-box;
+    top: 0;
+    left: 0;
+    border: 2px solid black;
+}
