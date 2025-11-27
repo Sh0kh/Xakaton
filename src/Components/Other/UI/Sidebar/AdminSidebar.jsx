@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { Card, Typography } from "@material-tailwind/react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Battery, Octagon, OctagonAlert, Zap } from "lucide-react";
 
 export default function AdminSidebar({ open }) {
     const [role] = useState("admin");
@@ -37,6 +37,18 @@ export default function AdminSidebar({ open }) {
                     path: "/admin/redevents",
                     icon: <AlertTriangle />,
                 },
+                {
+                    id:3,
+                    title:"Qoidabuzarliklar",
+                    path:"/admin/fines",
+                    icon:<OctagonAlert/>
+                },
+                {
+                    id:4,
+                    title:"Quvvat ulanishi",
+                    path:"/admin/powers",
+                    icon:<Zap/>
+                }
             ],
         },
     ];
