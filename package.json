@@ -38,7 +38,7 @@
     "react-router-dom": "^6.28.0",
     "react-select": "^5.8.3",
     "react-sweetalert2": "^0.6.0",
-    "recharts": "^2.15.3",
+    "recharts": "^2.15.4",
     "socket": "^1.1.36",
     "socket.io-client": "^4.8.1",
     "styled-components": "^6.1.17",

@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { LogOut, User, ChevronDown, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../../../store/authStore";
 
 export default function AdminHeader({ active, sidebarOpen }) {
+    const { logout } = useAuthStore((s) => s.logout)
     const navigate = useNavigate();
     const [openMenu, setOpenMenu] = useState(false);
     const menuRef = useRef(null);
@@ -18,8 +20,9 @@ export default function AdminHeader({ active, sidebarOpen }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const logout = () => {
+    const logoutNav = () => {
         localStorage.clear();
+        logout;
         navigate("/login");
     };
 
@@ -86,7 +89,7 @@ export default function AdminHeader({ active, sidebarOpen }) {
                         "
                     >
                         <button
-                            onClick={() => navigate("/profile")}
+                            onClick={() => navigate("/admin/profile")}
                             className="
                                 w-full px-4 py-3 flex items-center gap-2
                                 text-gray-700 hover:bg-gray-100
@@ -100,7 +103,7 @@ export default function AdminHeader({ active, sidebarOpen }) {
                         <div className="h-px bg-gray-200"></div>
 
                         <button
-                            onClick={logout}
+                            onClick={logoutNav}
                             className="
                                 w-full px-4 py-3 flex items-center gap-2
                                 text-red-600 hover:bg-red-50

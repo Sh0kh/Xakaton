@@ -1,4 +1,5 @@
 import Dashboard from "../Components/Admin/Dashboard";
+import ProfilePage from "../Components/Admin/Profile/Pofile";
 import RedEvents from "../Components/Admin/RedEvents/RedEvents";
 
 export const Rout = [
@@ -12,4 +13,9 @@ export const Rout = [
         path:"redevents",
         component:<RedEvents/>
     },
+    {
+        name:"profile",
+        path:"profile",
+        component:<ProfilePage/>
+    }
 ]
